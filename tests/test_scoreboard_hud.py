@@ -29,6 +29,32 @@ def test_local_hud_lines_falls_back_to_zeros_for_unknown_player():
     assert local_hud_lines(w, None) == ["SCORE 000000", "DEATHS 00", "WAVE 00"]
 
 
+def test_local_hud_lines_includes_room_line_when_room_id_provided():
+    w = World(spawn_default_player=False)
+    w.scores[7] = 250
+    w.deaths[7] = 1
+    w.wave = 3
+    lines = local_hud_lines(w, 7, room_id=2)
+    assert lines == [
+        "SCORE 000250",
+        "DEATHS 01",
+        "WAVE 03",
+        "ROOM 02",
+    ]
+
+
+def test_local_hud_lines_omits_room_line_when_room_id_none():
+    """Back-compat: callers that do not pass `room_id` see the
+    original three-line HUD."""
+    w = World(spawn_default_player=False)
+    w.scores[7] = 100
+    assert local_hud_lines(w, 7) == [
+        "SCORE 000100",
+        "DEATHS 00",
+        "WAVE 00",
+    ]
+
+
 def test_scoreboard_sorts_by_score_desc_then_pid_asc():
     w = World(spawn_default_player=False)
     w.scores = {1: 200, 2: 500, 3: 200}
