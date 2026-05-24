@@ -153,3 +153,52 @@ def test_begin_frame_clears_particle_events():
     world.begin_frame()
 
     assert world.particle_events == []
+
+
+def test_despawn_player_removes_all_player_state():
+    """Every World-owned per-player slot drops on despawn."""
+    world = World(spawn_default_player=False, deathmatch=True)
+    world.spawn_player(7)
+    world.match_state = "running"
+    world.scores[7] = 250
+    world.deaths[7] = 1
+    world.frags[7] = 2
+    world._ship_die(world.ships[7])
+    # _ship_die in DM removed the ship and put 7 in respawning.
+    assert 7 in world.respawning
+
+    world.despawn_player(7)
+
+    assert 7 not in world.ships
+    assert 7 not in world.scores
+    assert 7 not in world.lives
+    assert 7 not in world.deaths
+    assert 7 not in world.frags
+    assert 7 not in world.respawning
+    assert 7 not in world.extra_lives_awarded
+
+
+def test_despawn_player_is_idempotent():
+    """Calling despawn twice (or against a missing pid) does not raise."""
+    world = World(spawn_default_player=False, deathmatch=True)
+    world.spawn_player(7)
+
+    world.despawn_player(7)
+    world.despawn_player(7)  # second call must be a no-op
+    world.despawn_player(999)  # never existed
+
+
+def test_despawn_player_does_not_touch_other_players():
+    """Despawning one pid leaves siblings intact."""
+    world = World(spawn_default_player=False, deathmatch=True)
+    world.spawn_player(1)
+    world.spawn_player(2)
+    world.scores[2] = 500
+    world.frags[2] = 3
+
+    world.despawn_player(1)
+
+    assert 1 not in world.ships
+    assert 2 in world.ships
+    assert world.scores[2] == 500
+    assert world.frags[2] == 3

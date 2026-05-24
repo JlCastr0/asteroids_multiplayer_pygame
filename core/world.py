@@ -98,6 +98,21 @@ class World:
         self.frags[player_id] = 0
         self.extra_lives_awarded[player_id] = 0
 
+    def despawn_player(self, player_id: PlayerId) -> None:
+        """Drop every World-owned slot for ``player_id``.
+
+        Symmetric to ``spawn_player`` and idempotent — adding a new
+        per-player dict here is the single change required when a
+        future feature introduces one.
+        """
+        self.ships.pop(player_id, None)
+        self.scores.pop(player_id, None)
+        self.lives.pop(player_id, None)
+        self.deaths.pop(player_id, None)
+        self.frags.pop(player_id, None)
+        self.respawning.pop(player_id, None)
+        self.extra_lives_awarded.pop(player_id, None)
+
     def get_ship(self, player_id: PlayerId) -> Ship | None:
         return self.ships.get(player_id)
 
