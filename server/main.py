@@ -81,6 +81,10 @@ class Server:
         # Each player_id belongs to exactly one room; populated at handshake
         # acceptance and consulted by tick, broadcast, and cleanup paths.
         self.room_by_player_id: dict[int, int] = {}
+        # Connections that joined as read-only spectators. They get
+        # snapshots from their room but never spawn a ship, never send
+        # INPUT or RESTART_REQUEST, and do not count toward room cap.
+        self.spectator_pids: set[int] = set()
 
         self.worlds: dict[int, World] = {
             i: World(spawn_default_player=False, deathmatch=True)
@@ -124,6 +128,14 @@ class Server:
             pid
             for pid, rid in self.room_by_player_id.items()
             if rid == room_id
+        ]
+
+    def _player_pids_in_room(self, room_id: int) -> list[int]:
+        """`_pids_in_room` minus spectators; used for the room cap."""
+        return [
+            pid
+            for pid in self._pids_in_room(room_id)
+            if pid not in self.spectator_pids
         ]
 
     async def _snapshot_loop(self) -> None:
@@ -173,16 +185,24 @@ class Server:
         result = await self._handshake(ws)
         if result is None:
             return
-        player_id, name, room_id = result
+        player_id, name, room_id, is_spectator = result
 
         self.connections[player_id] = ws
         self._names_by_player_id[player_id] = name
         self.room_by_player_id[player_id] = room_id
-        self.worlds[room_id].spawn_player(player_id)
+        if is_spectator:
+            self.spectator_pids.add(player_id)
+        else:
+            self.worlds[room_id].spawn_player(player_id)
         try:
             async for raw in ws:
                 msg = parse(raw)
                 if msg is None:
+                    continue
+                if player_id in self.spectator_pids:
+                    # Spectators are read-only; drop any unsolicited input
+                    # or restart attempt silently. Defense in depth — the
+                    # client side already refuses to send these.
                     continue
                 if msg["type"] == INPUT:
                     self._inputs_by_player_id[player_id] = dict_to_command(
@@ -192,12 +212,14 @@ class Server:
                     self._handle_restart_request(player_id)
         finally:
             room_id = self.room_by_player_id.pop(player_id, 0)
+            was_spectator = player_id in self.spectator_pids
+            self.spectator_pids.discard(player_id)
             self.connections.pop(player_id, None)
             self._seq_by_player_id.pop(player_id, None)
             self._inputs_by_player_id.pop(player_id, None)
             self._names_by_player_id.pop(player_id, None)
             world = self.worlds.get(room_id)
-            if world is not None:
+            if world is not None and not was_spectator:
                 world.despawn_player(player_id)
 
     def _handle_restart_request(self, player_id: int) -> None:
@@ -217,7 +239,7 @@ class Server:
         for pid in self._pids_in_room(room_id):
             world.spawn_player(pid)
 
-    async def _handshake(self, ws: Any) -> tuple[int, str, int] | None:
+    async def _handshake(self, ws: Any) -> tuple[int, str, int, bool] | None:
         try:
             raw = await asyncio.wait_for(ws.recv(), timeout=HANDSHAKE_TIMEOUT)
         except TimeoutError:
@@ -244,7 +266,11 @@ class Server:
             await self._reject_and_close(ws, "invalid_room")
             return None
 
-        if len(self._pids_in_room(room_id)) >= C.MAX_PLAYERS:
+        is_spectator = bool(msg["data"].get("spectator", False))
+        if (
+            not is_spectator
+            and len(self._player_pids_in_room(room_id)) >= C.MAX_PLAYERS
+        ):
             await self._reject_and_close(ws, "room_full")
             return None
 
@@ -259,7 +285,7 @@ class Server:
         await ws.send(
             envelope(WELCOME, self.tick, 0, {"player_id": player_id})
         )
-        return player_id, name, room_id
+        return player_id, name, room_id, is_spectator
 
     async def _reject_and_close(self, ws: Any, reason: str) -> None:
         await ws.send(envelope(REJECT, self.tick, 0, {"reason": reason}))
