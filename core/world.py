@@ -121,7 +121,7 @@ class World:
                 continue
 
             if cmd.hyperspace:
-                ship.hyperspace()
+                ship.hyperspace(self._find_safe_hyperspace_pos(ship))
                 self.scores[player_id] = max(0, self.scores[player_id] - C.HYPERSPACE_COST)
 
             bullet = ship.apply_command(cmd, dt, self.bullets)
@@ -157,6 +157,22 @@ class World:
                 min_dist = d
                 nearest = ship
         return nearest.pos if nearest else None
+
+    def _find_safe_hyperspace_pos(self, ship: Ship) -> Vec:
+        """Pick a random position that is not on top of an asteroid.
+
+        Tries HYPERSPACE_ATTEMPTS times. Falls back to an unchecked random
+        position if no clear spot is found, which only happens when the screen
+        is saturated with asteroids.
+        """
+        for _ in range(C.HYPERSPACE_ATTEMPTS):
+            pos = Vec(uniform(0, C.WIDTH), uniform(0, C.HEIGHT))
+            if all(
+                (pos - ast.pos).length() > (ast.r + ship.r + C.HYPERSPACE_SAFE_MARGIN)
+                for ast in self.asteroids
+            ):
+                return pos
+        return Vec(uniform(0, C.WIDTH), uniform(0, C.HEIGHT))
 
     def _update_timers(self, dt: float) -> None:
         self.ufo_timer -= dt

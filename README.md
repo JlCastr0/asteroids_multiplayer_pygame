@@ -18,7 +18,7 @@ python main.py
 | `←` `→`  | Rotate |
 | `↑`      | Thrust |
 | `Space`  | Shoot  |
-| `H`      | Hyperspace (costs 250 points, may drop you on top of an asteroid) |
+| `H`      | Hyperspace (costs 250 points) |
 | `Esc`    | Quit |
 
 ## How it works
@@ -36,8 +36,6 @@ Key files:
 - [`core/entities.py`](core/entities.py): `Ship`, `Asteroid`, `Bullet`, `UFO`.
 - [`core/collisions.py`](core/collisions.py): `CollisionManager` resolves every collision in a single pass and returns a `CollisionResult`.
 - [`client/game.py`](client/game.py): game loop and scene transitions (menu, play, game over).
-
-A known bug: hyperspace can teleport the ship inside an asteroid.
 
 ## Project layout
 

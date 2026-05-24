@@ -235,10 +235,6 @@ Code duplication:
 - Timer/countdown pattern repeated 5+ times without a utility
 - 5 collision methods with repetitive structure
 
-Known bug:
-- Hyperspace can teleport the player inside an asteroid (no safe
-  position check).
-
 ### 6.4 Readability (7/10)
 
 Strengths:

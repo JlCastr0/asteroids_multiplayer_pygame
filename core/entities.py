@@ -139,8 +139,9 @@ class Ship(pg.sprite.Sprite):
         self.cool = float(C.SHIP_FIRE_RATE)
         return Bullet(self.player_id, pos, vel, ttl=C.BULLET_TTL)
 
-    def hyperspace(self) -> None:
-        self.pos = Vec(uniform(0, C.WIDTH), uniform(0, C.HEIGHT))
+    def hyperspace(self, pos: Vec) -> None:
+        """Teleport to the given position. The caller picks where it is safe."""
+        self.pos = Vec(pos)
         self.vel.xy = (0, 0)
         self.invuln = float(C.SAFE_SPAWN_TIME)
 
