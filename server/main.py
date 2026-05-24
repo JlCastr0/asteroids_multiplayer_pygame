@@ -146,13 +146,7 @@ class Server:
             self._seq_by_player_id.pop(player_id, None)
             self._inputs_by_player_id.pop(player_id, None)
             self._names_by_player_id.pop(player_id, None)
-            self.world.ships.pop(player_id, None)
-            self.world.scores.pop(player_id, None)
-            self.world.lives.pop(player_id, None)
-            self.world.deaths.pop(player_id, None)
-            self.world.frags.pop(player_id, None)
-            self.world.respawning.pop(player_id, None)
-            self.world.extra_lives_awarded.pop(player_id, None)
+            self.world.despawn_player(player_id)
 
     def _handle_restart_request(self) -> None:
         """Reset the world back to the lobby and re-spawn every connection.

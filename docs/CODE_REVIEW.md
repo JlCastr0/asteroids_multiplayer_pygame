@@ -227,4 +227,14 @@ measurements add richer didactic content.
 
 Append resolution notes here as PRs land:
 
-- _(empty — first entry will be PR 2)_
+- 2026-05-24 — PR #23 (`style/pep8-line-length-79`) closes the
+  85-violation style debt: `line-length = 79` in `pyproject.toml`,
+  `ruff format` applied across 20 files, eleven manual rewordings
+  for docstrings ruff cannot rewrap.
+- 2026-05-24 — PR #24 (`chore/perf-instrumentation`) lands the
+  measurement infrastructure and the first baseline. Recorded
+  decision: PR 4 not activated (see `docs/PERF_BASELINE.md §4`).
+- 2026-05-24 — PR #25 (`refactor/world-despawn-player`) resolves
+  **S-2**: `World.despawn_player(pid)` owns the seven
+  per-player World-side `pop`s; the server `finally` block drops
+  from eleven lines to five. Three new tests cover the contract.
