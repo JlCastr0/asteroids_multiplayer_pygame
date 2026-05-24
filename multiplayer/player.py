@@ -53,10 +53,19 @@ HANDSHAKE_TIMEOUT = 5.0
 
 
 class Player:
-    def __init__(self, host: str, port: int, name: str) -> None:
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        name: str,
+        room: int,
+        token: str,
+    ) -> None:
         self.host = host
         self.port = port
         self.name = name
+        self.room = room
+        self.token = token
         self.player_id: int | None = None
         self.server_tick = 0
         self.seq = 0
@@ -95,7 +104,12 @@ class Player:
             pg.quit()
 
     async def _handshake(self, ws: Any) -> bool:
-        await ws.send(envelope(HELLO, 0, 0, {"name": self.name}))
+        hello_data = {
+            "name": self.name,
+            "room_id": self.room,
+            "token": self.token,
+        }
+        await ws.send(envelope(HELLO, 0, 0, hello_data))
         try:
             raw = await asyncio.wait_for(ws.recv(), timeout=HANDSHAKE_TIMEOUT)
         except TimeoutError:
@@ -195,7 +209,12 @@ class Player:
                 self.camera.update(Vec(C.WORLD_WIDTH / 2, C.WORLD_HEIGHT / 2))
             self.renderer.draw_world(self.world)
             draw_local_hud(
-                self.screen, self.font, self.world, self.player_id, C.WHITE
+                self.screen,
+                self.font,
+                self.world,
+                self.player_id,
+                C.WHITE,
+                room_id=self.room,
             )
             draw_scoreboard(
                 self.screen, self.font, self.world, self.player_id, C.WHITE
@@ -236,10 +255,22 @@ def main() -> None:
     parser.add_argument(
         "--name", default="player", help="display name (default: player)"
     )
+    parser.add_argument(
+        "--room",
+        default=0,
+        type=int,
+        help="room id to join (default: 0)",
+    )
+    parser.add_argument(
+        "--token",
+        required=True,
+        help="allowlist token issued by the server operator",
+    )
     args = parser.parse_args()
 
+    player = Player(args.host, args.port, args.name, args.room, args.token)
     try:
-        asyncio.run(Player(args.host, args.port, args.name).run())
+        asyncio.run(player.run())
     except KeyboardInterrupt:
         print()
 

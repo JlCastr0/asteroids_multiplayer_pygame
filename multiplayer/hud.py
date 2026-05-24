@@ -18,21 +18,30 @@ _LINE_GAP = 2
 _NAME_WIDTH = 10
 
 
-def local_hud_lines(world: World, player_id: int | None) -> list[str]:
-    """Three-line summary for the local player: score, deaths, wave.
+def local_hud_lines(
+    world: World,
+    player_id: int | None,
+    room_id: int | None = None,
+) -> list[str]:
+    """Summary for the local player: score, deaths, wave, optional room.
 
     Falls back to zeros when the player has no state yet — keeps the HUD
-    width stable during the handshake handful of frames.
+    width stable during the handshake handful of frames. When ``room_id``
+    is provided, a fourth line ``ROOM NN`` is appended.
     """
     if player_id is None or player_id not in world.scores:
-        return ["SCORE 000000", "DEATHS 00", "WAVE 00"]
-    score = world.scores[player_id]
-    deaths = world.deaths.get(player_id, 0)
-    return [
-        f"SCORE {score:06d}",
-        f"DEATHS {deaths:02d}",
-        f"WAVE {world.wave:02d}",
-    ]
+        lines = ["SCORE 000000", "DEATHS 00", "WAVE 00"]
+    else:
+        score = world.scores[player_id]
+        deaths = world.deaths.get(player_id, 0)
+        lines = [
+            f"SCORE {score:06d}",
+            f"DEATHS {deaths:02d}",
+            f"WAVE {world.wave:02d}",
+        ]
+    if room_id is not None:
+        lines.append(f"ROOM {room_id:02d}")
+    return lines
 
 
 def scoreboard_lines(world: World, local_player_id: int | None) -> list[str]:
@@ -62,9 +71,10 @@ def draw_local_hud(
     world: World,
     player_id: int | None,
     color: tuple[int, int, int],
+    room_id: int | None = None,
 ) -> None:
     x, y = _PADDING, _PADDING
-    for line in local_hud_lines(world, player_id):
+    for line in local_hud_lines(world, player_id, room_id=room_id):
         label = font.render(line, True, color)
         screen.blit(label, (x, y))
         y += font.get_height() + _LINE_GAP
