@@ -36,6 +36,7 @@ class CollisionManager:
         result = CollisionResult()
         self._bullets_vs_asteroids(bullets, asteroids, result)
         self._ufo_vs_player_bullets(ufos, bullets, result)
+        self._bullets_vs_ships(ships, bullets, result)
         self._ufo_vs_asteroids(ufos, asteroids, result)
         self._ship_vs_asteroids(ships, asteroids, result)
         self._ship_vs_ufos(ships, ufos, result)
@@ -176,6 +177,35 @@ class CollisionManager:
                         continue
                     result.ship_deaths.append(ship.player_id)
                     return
+
+    def _bullets_vs_ships(
+        self,
+        ships: dict[PlayerId, Ship],
+        bullets: list[Bullet],
+        result: CollisionResult,
+    ) -> None:
+        """Player bullet hits another player's ship (deathmatch frag).
+
+        Skips UFO bullets (handled in _ship_vs_ufo_bullets) and the shooter's
+        own ship (no auto-kill — the bullet passes through harmlessly).
+        """
+        for ship in ships.values():
+            if ship.invuln.active:
+                continue
+            for bullet in bullets:
+                if not bullet.alive or bullet.owner_id <= 0:
+                    continue
+                if bullet.owner_id == ship.player_id:
+                    continue
+                if (bullet.pos - ship.pos).length() < (bullet.r + ship.r):
+                    bullet.kill()
+                    if ship.shield.active:
+                        continue
+                    result.score_deltas[bullet.owner_id] = (
+                        result.score_deltas.get(bullet.owner_id, 0) + C.FRAG_SCORE
+                    )
+                    result.ship_deaths.append(ship.player_id)
+                    break
 
     def _split_asteroid(
         self,
