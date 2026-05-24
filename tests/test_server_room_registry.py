@@ -106,9 +106,10 @@ def test_handshake_accepts_valid_room_id():
     result = asyncio.run(server._handshake(ws))
 
     assert result is not None
-    player_id, name, room_id = result
+    player_id, name, room_id, is_spectator = result
     assert name == "alice"
     assert room_id == 1
+    assert is_spectator is False
     welcome = json.loads(ws.sent[-1])
     assert welcome["type"] == "welcome"
     assert welcome["data"]["player_id"] == player_id
@@ -122,7 +123,7 @@ def test_handshake_defaults_room_id_to_zero_when_missing():
     result = asyncio.run(server._handshake(ws))
 
     assert result is not None
-    _, _, room_id = result
+    _, _, room_id, _ = result
     assert room_id == 0
 
 
@@ -187,7 +188,7 @@ def test_handshake_accepts_when_target_room_has_space():
     result = asyncio.run(server._handshake(ws))
 
     assert result is not None
-    _, _, room_id = result
+    _, _, room_id, _ = result
     assert room_id == 1
 
 
