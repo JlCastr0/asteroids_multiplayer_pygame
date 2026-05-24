@@ -238,6 +238,7 @@ class UFO(Entity):
         pos: Vec,
         small: bool,
         target_pos: Vec | None = None,
+        setup_position: bool = True,
     ) -> None:
         super().__init__()
         self.small = small
@@ -252,10 +253,13 @@ class UFO(Entity):
 
         self.target_pos: Vec | None = None
 
-        if self.small:
-            self._lock_small_move_dir(target_pos)
-
-        self._setup_crossing_if_needed()
+        # When reconstructing a UFO from a server snapshot we keep pos/vel
+        # exactly as received; the crossing/pursue setup would otherwise
+        # randomize them.
+        if setup_position:
+            if self.small:
+                self._lock_small_move_dir(target_pos)
+            self._setup_crossing_if_needed()
 
     def _lock_small_move_dir(self, target_pos: Vec | None) -> None:
         if target_pos is None:

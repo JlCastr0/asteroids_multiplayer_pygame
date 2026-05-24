@@ -2,8 +2,9 @@
 
 The server owns a single authoritative `World`, advances it at FPS (60 Hz),
 and broadcasts a serialized snapshot to every connected client at
-SNAPSHOT_HZ (30 Hz). Client input is not yet wired — that lands with the
-networked player client in the next PR.
+SNAPSHOT_HZ (30 Hz). Each client owns one ship — spawned at the welcome
+handshake and removed on disconnect — and pushes INPUT messages that the
+tick loop applies on the next update.
 """
 
 from __future__ import annotations
@@ -16,9 +17,12 @@ from typing import Any
 import websockets
 
 from core import config as C
+from core.commands import PlayerCommand
 from core.world import World
+from multiplayer.command_codec import dict_to_command
 from server.protocol import (
     HELLO,
+    INPUT,
     REJECT,
     SNAPSHOT,
     WELCOME,
@@ -49,8 +53,12 @@ class Server:
         self.connections: dict[int, Any] = {}
         self._next_player_id = 1
         self._seq_by_player_id: dict[int, int] = {}
+        # Last input seen for each player. Kept sticky between frames so a
+        # 30 Hz client still drives a 60 Hz simulation smoothly; the slot
+        # is cleared when the player disconnects.
+        self._inputs_by_player_id: dict[int, PlayerCommand] = {}
 
-        self.world = World()
+        self.world = World(spawn_default_player=False)
 
     async def run(self) -> None:
         async with websockets.serve(self._handle_connection, self.host, self.port):
@@ -62,7 +70,7 @@ class Server:
         period = 1.0 / C.FPS
         while True:
             await asyncio.sleep(period)
-            self.world.update(dt, {})
+            self.world.update(dt, self._inputs_by_player_id)
             self.tick += 1
 
     async def _snapshot_loop(self) -> None:
@@ -89,12 +97,22 @@ class Server:
             return
 
         self.connections[player_id] = ws
+        self.world.spawn_player(player_id)
         try:
-            async for _ in ws:
-                pass  # input handling lands in a later PR
+            async for raw in ws:
+                msg = parse(raw)
+                if msg is None:
+                    continue
+                if msg["type"] == INPUT:
+                    self._inputs_by_player_id[player_id] = dict_to_command(msg["data"])
         finally:
             self.connections.pop(player_id, None)
             self._seq_by_player_id.pop(player_id, None)
+            self._inputs_by_player_id.pop(player_id, None)
+            self.world.ships.pop(player_id, None)
+            self.world.scores.pop(player_id, None)
+            self.world.lives.pop(player_id, None)
+            self.world.extra_lives_awarded.pop(player_id, None)
 
     async def _handshake(self, ws: Any) -> int | None:
         try:

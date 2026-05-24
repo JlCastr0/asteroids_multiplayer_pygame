@@ -24,7 +24,7 @@ class World:
       end of each update tick.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, spawn_default_player: bool = True) -> None:
         self.ships: dict[PlayerId, Ship] = {}
         self.bullets: list[Bullet] = []
         self.asteroids: list[Asteroid] = []
@@ -44,7 +44,10 @@ class World:
 
         self.game_over = False
 
-        self.spawn_player(C.LOCAL_PLAYER_ID)
+        # Single-player keeps the implicit local ship; server and networked
+        # client opt out and let real connections drive ship lifecycle.
+        if spawn_default_player:
+            self.spawn_player(C.LOCAL_PLAYER_ID)
 
     def begin_frame(self) -> None:
         self.events.clear()
