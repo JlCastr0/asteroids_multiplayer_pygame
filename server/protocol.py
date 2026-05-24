@@ -31,7 +31,6 @@ BYE = "bye"
 WELCOME = "welcome"
 REJECT = "reject"
 SNAPSHOT = "snapshot"
-EVENT = "event"
 
 
 def envelope(msg_type: str, tick: int, seq: int, data: dict[str, Any]) -> str:
@@ -66,9 +65,11 @@ def parse(raw: str | bytes) -> dict[str, Any] | None:
 def world_to_snapshot(world: World) -> dict[str, Any]:
     """Serialize a World into a JSON-safe dict for the SNAPSHOT message.
 
-    Particles are excluded on purpose: they are short-lived visual effects
-    derived locally from EVENT messages, so shipping them in every snapshot
-    would waste bandwidth without gameplay value.
+    Particles themselves are excluded on purpose: they are short-lived
+    visual effects. Instead the snapshot carries the discrete events that
+    spawn them (``events: [{kind, x, y}, ...]``) and the client recreates
+    the particles locally — that way bandwidth scales with the number of
+    explosions, not with the number of particles per explosion.
 
     The asteroid polygon (`poly`) is also excluded — the client regenerates
     it from (size, position) when reconstructing the world. Polygon jitter
@@ -122,6 +123,11 @@ def world_to_snapshot(world: World) -> dict[str, Any]:
         ],
         "scores": {str(pid): score for pid, score in world.scores.items()},
         "lives": {str(pid): lives for pid, lives in world.lives.items()},
+        "deaths": {str(pid): n for pid, n in world.deaths.items()},
+        "respawning": [
+            {"player_id": pid, "remaining": cd.remaining} for pid, cd in world.respawning.items()
+        ],
+        "events": [{"kind": kind, "x": pos.x, "y": pos.y} for kind, pos in world.particle_events],
         "wave": world.wave,
         "game_over": world.game_over,
     }

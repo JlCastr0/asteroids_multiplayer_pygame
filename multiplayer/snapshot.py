@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import Any
 
 from core.entities import UFO, Asteroid, Bullet, Ship
-from core.utils import Vec
+from core.utils import Countdown, Vec
 from core.world import World
 
 # Brief lifetime used to flip a Countdown's `.active` to True for one
@@ -35,8 +35,19 @@ def snapshot_to_world(snap: dict[str, Any], world: World) -> None:
 
     world.scores = {int(pid): score for pid, score in snap["scores"].items()}
     world.lives = {int(pid): lives for pid, lives in snap["lives"].items()}
+    world.deaths = {int(pid): n for pid, n in snap.get("deaths", {}).items()}
+    world.respawning = {
+        int(entry["player_id"]): Countdown(entry["remaining"])
+        for entry in snap.get("respawning", [])
+    }
     world.wave = snap["wave"]
     world.game_over = snap["game_over"]
+
+    # Particles are not transported in the snapshot itself — only the
+    # discrete events that spawn them. The client materializes them by
+    # calling the same _spawn_particles the server used.
+    for ev in snap.get("events", []):
+        world._spawn_particles(Vec(ev["x"], ev["y"]), ev["kind"])
 
 
 def _apply_ships(ships_snap: list[dict[str, Any]], world: World) -> None:

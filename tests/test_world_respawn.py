@@ -123,3 +123,24 @@ def test_deathmatch_repeated_deaths_increment_deaths_counter():
     assert world.deaths[7] == 2
     assert 7 not in world.ships
     assert 7 in world.respawning
+
+
+def test_spawn_particles_records_particle_events():
+    world = World(spawn_default_player=False)
+    world._spawn_particles(Vec(10, 20), "asteroid")
+    world._spawn_particles(Vec(30, 40), "ship")
+    assert len(world.particle_events) == 2
+    kind0, pos0 = world.particle_events[0]
+    kind1, pos1 = world.particle_events[1]
+    assert (kind0, pos0.x, pos0.y) == ("asteroid", 10, 20)
+    assert (kind1, pos1.x, pos1.y) == ("ship", 30, 40)
+
+
+def test_begin_frame_clears_particle_events():
+    world = World(spawn_default_player=False)
+    world._spawn_particles(Vec(10, 20), "asteroid")
+    assert world.particle_events
+
+    world.begin_frame()
+
+    assert world.particle_events == []

@@ -47,6 +47,10 @@ class World:
         self.extra_life_notice = Countdown()
 
         self.events: list[str] = []
+        # Particle-spawning events recorded each tick; the server ships them
+        # in the snapshot so the networked client can recreate visuals
+        # without simulating collisions itself.
+        self.particle_events: list[tuple[str, Vec]] = []
         self._collision_mgr = CollisionManager()
 
         self.game_over = False
@@ -58,6 +62,7 @@ class World:
 
     def begin_frame(self) -> None:
         self.events.clear()
+        self.particle_events.clear()
 
     def reset(self) -> None:
         """Reset the world (used on Game Over)."""
@@ -250,6 +255,7 @@ class World:
                 self._ship_die(ship)
 
     def _spawn_particles(self, pos: Vec, kind: str) -> None:
+        self.particle_events.append((kind, Vec(pos)))
         count, sp_min, sp_max, ttl = {
             "asteroid": C.PARTICLE_ASTEROID,
             "ufo": C.PARTICLE_UFO,

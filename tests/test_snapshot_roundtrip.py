@@ -14,6 +14,9 @@ EMPTY_SNAPSHOT = {
     "ufos": [],
     "scores": {},
     "lives": {},
+    "deaths": {},
+    "respawning": [],
+    "events": [],
     "wave": 0,
     "game_over": False,
 }
@@ -173,3 +176,42 @@ def test_command_codec_roundtrip_default_command():
 def test_command_codec_treats_missing_keys_as_false():
     cmd = dict_to_command({})
     assert cmd == PlayerCommand()
+
+
+def test_snapshot_to_world_preserves_deaths():
+    w = World(spawn_default_player=False)
+    snapshot_to_world(_snapshot(deaths={"5": 4, "7": 1}), w)
+    assert w.deaths == {5: 4, 7: 1}
+
+
+def test_snapshot_to_world_preserves_respawning_remaining():
+    w = World(spawn_default_player=False)
+    snapshot_to_world(
+        _snapshot(respawning=[{"player_id": 5, "remaining": 2.4}]),
+        w,
+    )
+    assert 5 in w.respawning
+    assert w.respawning[5].active
+    assert w.respawning[5].remaining == 2.4
+
+
+def test_snapshot_to_world_spawns_local_particles_from_events():
+    from core import config as C
+
+    w = World(spawn_default_player=False)
+    snapshot_to_world(
+        _snapshot(events=[{"kind": "asteroid", "x": 10, "y": 20}]),
+        w,
+    )
+    expected_count, *_ = C.PARTICLE_ASTEROID
+    assert len(w.particles) == expected_count
+    assert (w.particles[0].pos.x, w.particles[0].pos.y) == (10, 20)
+
+
+def test_snapshot_to_world_omits_respawning_when_field_missing():
+    """Older or partial snapshots without a `respawning` field must not crash."""
+    w = World(spawn_default_player=False)
+    snap = {**EMPTY_SNAPSHOT}
+    del snap["respawning"]
+    snapshot_to_world(snap, w)
+    assert w.respawning == {}

@@ -5,6 +5,7 @@ import json
 from core.entities import UFO, Bullet, Particle
 from core.utils import Vec
 from core.world import World
+from server import protocol
 from server.protocol import HELLO, WELCOME, envelope, parse, world_to_snapshot
 
 
@@ -81,6 +82,9 @@ def test_world_to_snapshot_has_required_keys():
         "ufos",
         "scores",
         "lives",
+        "deaths",
+        "respawning",
+        "events",
         "wave",
         "game_over",
     }
@@ -155,3 +159,46 @@ def test_snapshot_is_json_serializable_end_to_end():
     w.ufos.append(UFO(Vec(100, 100), small=False))
     snap = world_to_snapshot(w)
     json.dumps(snap)  # must not raise
+
+
+def test_snapshot_includes_deaths_dict():
+    w = World(spawn_default_player=False, deathmatch=True)
+    w.spawn_player(3)
+    w.deaths[3] = 7
+    snap = world_to_snapshot(w)
+    assert snap["deaths"] == {"3": 7}
+
+
+def test_snapshot_includes_respawning_list_when_deathmatch():
+    w = World(spawn_default_player=False, deathmatch=True)
+    w.spawn_player(3)
+    w._ship_die(w.ships[3])  # noqa: SLF001 — exercising the public side-effect
+    snap = world_to_snapshot(w)
+    assert len(snap["respawning"]) == 1
+    entry = snap["respawning"][0]
+    assert entry["player_id"] == 3
+    assert entry["remaining"] > 0
+
+
+def test_snapshot_events_empty_when_no_particles_spawned():
+    snap = world_to_snapshot(World())
+    assert snap["events"] == []
+
+
+def test_snapshot_includes_events_for_each_spawn_kind():
+    w = World()
+    w._spawn_particles(Vec(10, 20), "asteroid")  # noqa: SLF001
+    w._spawn_particles(Vec(30, 40), "ufo")  # noqa: SLF001
+    w._spawn_particles(Vec(50, 60), "ship")  # noqa: SLF001
+    snap = world_to_snapshot(w)
+    assert snap["events"] == [
+        {"kind": "asteroid", "x": 10, "y": 20},
+        {"kind": "ufo", "x": 30, "y": 40},
+        {"kind": "ship", "x": 50, "y": 60},
+    ]
+
+
+def test_event_constant_removed_from_protocol():
+    """The EVENT message type was dropped in favor of an `events` field
+    inside the SNAPSHOT payload. Guard against the constant creeping back."""
+    assert not hasattr(protocol, "EVENT")
