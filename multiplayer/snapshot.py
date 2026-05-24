@@ -36,11 +36,15 @@ def snapshot_to_world(snap: dict[str, Any], world: World) -> None:
     world.scores = {int(pid): score for pid, score in snap["scores"].items()}
     world.lives = {int(pid): lives for pid, lives in snap["lives"].items()}
     world.deaths = {int(pid): n for pid, n in snap.get("deaths", {}).items()}
+    world.frags = {int(pid): n for pid, n in snap.get("frags", {}).items()}
     world.respawning = {
         int(entry["player_id"]): Countdown(entry["remaining"])
         for entry in snap.get("respawning", [])
     }
     world.names = {int(pid): name for pid, name in snap.get("names", {}).items()}
+    world.match_state = snap.get("match_state", "running")
+    world.match_timer.reset(snap.get("time_remaining", 0.0))
+    world.winner_id = snap.get("winner_id")
     world.wave = snap["wave"]
     world.game_over = snap["game_over"]
 

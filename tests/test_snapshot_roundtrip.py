@@ -15,9 +15,13 @@ EMPTY_SNAPSHOT = {
     "scores": {},
     "lives": {},
     "deaths": {},
+    "frags": {},
     "respawning": [],
     "events": [],
     "names": {},
+    "match_state": "running",
+    "time_remaining": 0.0,
+    "winner_id": None,
     "wave": 0,
     "game_over": False,
 }
@@ -222,3 +226,37 @@ def test_snapshot_to_world_preserves_names():
     w = World(spawn_default_player=False)
     snapshot_to_world(_snapshot(names={"1": "Alice", "2": "Bob"}), w)
     assert w.names == {1: "Alice", 2: "Bob"}
+
+
+def test_snapshot_to_world_applies_match_state():
+    w = World(spawn_default_player=False)
+    snapshot_to_world(_snapshot(match_state="ended"), w)
+    assert w.match_state == "ended"
+
+
+def test_snapshot_to_world_applies_time_remaining():
+    w = World(spawn_default_player=False)
+    snapshot_to_world(_snapshot(time_remaining=42.5), w)
+    assert w.match_timer.remaining == 42.5
+
+
+def test_snapshot_to_world_applies_frags():
+    w = World(spawn_default_player=False)
+    snapshot_to_world(_snapshot(frags={"1": 3, "2": 1}), w)
+    assert w.frags == {1: 3, 2: 1}
+
+
+def test_snapshot_to_world_applies_winner_id():
+    w = World(spawn_default_player=False)
+    snapshot_to_world(_snapshot(winner_id=7), w)
+    assert w.winner_id == 7
+
+
+def test_snapshot_to_world_defaults_match_state_for_legacy_payloads():
+    """A snapshot without match_state must not crash; defaults to running
+    so legacy payloads keep working through the F4 transition."""
+    w = World(spawn_default_player=False)
+    snap = {**EMPTY_SNAPSHOT}
+    del snap["match_state"]
+    snapshot_to_world(snap, w)
+    assert w.match_state == "running"

@@ -83,9 +83,13 @@ def test_world_to_snapshot_has_required_keys():
         "scores",
         "lives",
         "deaths",
+        "frags",
         "respawning",
         "events",
         "names",
+        "match_state",
+        "time_remaining",
+        "winner_id",
         "wave",
         "game_over",
     }
@@ -213,3 +217,33 @@ def test_snapshot_includes_names_when_provided():
 def test_snapshot_names_empty_when_not_provided():
     snap = world_to_snapshot(World())
     assert snap["names"] == {}
+
+
+def test_snapshot_match_state_running_for_single_player_world():
+    snap = world_to_snapshot(World())
+    assert snap["match_state"] == "running"
+
+
+def test_snapshot_match_state_lobby_by_default_in_deathmatch_world():
+    snap = world_to_snapshot(World(spawn_default_player=False, deathmatch=True))
+    assert snap["match_state"] == "lobby"
+
+
+def test_snapshot_time_remaining_reflects_match_timer():
+    w = World(spawn_default_player=False, deathmatch=True)
+    w.match_timer.reset(75.0)
+    snap = world_to_snapshot(w)
+    assert snap["time_remaining"] == 75.0
+
+
+def test_snapshot_frags_use_string_keys():
+    w = World(spawn_default_player=False, deathmatch=True)
+    w.spawn_player(3)
+    w.frags[3] = 2
+    snap = world_to_snapshot(w)
+    assert snap["frags"] == {"3": 2}
+
+
+def test_snapshot_winner_id_none_until_match_ends():
+    snap = world_to_snapshot(World(spawn_default_player=False, deathmatch=True))
+    assert snap["winner_id"] is None

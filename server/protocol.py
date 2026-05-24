@@ -136,6 +136,10 @@ def world_to_snapshot(
         ],
         "events": [{"kind": kind, "x": pos.x, "y": pos.y} for kind, pos in world.particle_events],
         "names": {str(pid): name for pid, name in (names or {}).items()},
+        "match_state": world.match_state,
+        "time_remaining": world.match_timer.remaining,
+        "frags": {str(pid): n for pid, n in world.frags.items()},
+        "winner_id": world.winner_id,
         "wave": world.wave,
         "game_over": world.game_over,
     }
