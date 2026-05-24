@@ -118,7 +118,7 @@ class Renderer:
         ]
         pg.draw.polygon(self.screen, self.config.WHITE, points, width=1)
 
-        if ship.invuln > 0.0 and int(ship.invuln * 10) % 2 == 0:
+        if ship.invuln.active and int(ship.invuln.remaining * 10) % 2 == 0:
             center = (int(ship.pos.x), int(ship.pos.y))
             pg.draw.circle(
                 self.screen,

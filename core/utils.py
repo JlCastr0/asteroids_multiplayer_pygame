@@ -11,6 +11,40 @@ from core import config as C
 Vec = pg.math.Vector2
 
 
+class Countdown:
+    """Saturating countdown timer driven by dt.
+
+    Construct with the initial seconds (0 means inactive). Call tick(dt) every
+    frame; it returns True on the single frame the timer reaches zero. Use
+    reset(seconds) to restart it.
+    """
+
+    __slots__ = ("_t",)
+
+    def __init__(self, seconds: float = 0.0) -> None:
+        self._t = float(seconds)
+
+    def reset(self, seconds: float) -> None:
+        self._t = float(seconds)
+
+    def tick(self, dt: float) -> bool:
+        if self._t <= 0.0:
+            return False
+        self._t -= dt
+        if self._t <= 0.0:
+            self._t = 0.0
+            return True
+        return False
+
+    @property
+    def active(self) -> bool:
+        return self._t > 0.0
+
+    @property
+    def remaining(self) -> float:
+        return self._t
+
+
 def wrap_pos(pos: Vec) -> Vec:
     return Vec(pos.x % C.WIDTH, pos.y % C.HEIGHT)
 

@@ -111,7 +111,7 @@ class CollisionManager:
         result: CollisionResult,
     ) -> None:
         for ship in ships.values():
-            if ship.invuln > 0.0:
+            if ship.invuln.active:
                 continue
             for ast in asteroids:
                 if (ast.pos - ship.pos).length() < (ast.r + ship.r):
@@ -125,7 +125,7 @@ class CollisionManager:
         result: CollisionResult,
     ) -> None:
         for ship in ships.values():
-            if ship.invuln > 0.0:
+            if ship.invuln.active:
                 continue
             for bullet in list(bullets):
                 if bullet.owner_id != UFO_BULLET_OWNER:

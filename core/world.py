@@ -9,7 +9,7 @@ from core import config as C
 from core.collisions import CollisionManager
 from core.commands import PlayerCommand
 from core.entities import UFO, Asteroid, Ship
-from core.utils import Vec, rand_edge_pos
+from core.utils import Countdown, Vec, rand_edge_pos
 
 PlayerId = int
 
@@ -32,8 +32,8 @@ class World:
         self.scores: dict[PlayerId, int] = {}
         self.lives: dict[PlayerId, int] = {}
         self.wave = 0
-        self.wave_cool = float(C.WAVE_DELAY)
-        self.ufo_timer = float(C.UFO_SPAWN_EVERY)
+        self.wave_cool = Countdown(C.WAVE_DELAY)
+        self.ufo_timer = Countdown(C.UFO_SPAWN_EVERY)
 
         self.events: list[str] = []
         self._collision_mgr = CollisionManager()
@@ -52,7 +52,7 @@ class World:
     def spawn_player(self, player_id: PlayerId) -> None:
         pos = Vec(C.WIDTH / 2, C.HEIGHT / 2)
         ship = Ship(player_id, pos)
-        ship.invuln = float(C.SAFE_SPAWN_TIME)
+        ship.invuln.reset(C.SAFE_SPAWN_TIME)
 
         self.ships[player_id] = ship
         self.scores[player_id] = 0
@@ -175,19 +175,17 @@ class World:
         return Vec(uniform(0, C.WIDTH), uniform(0, C.HEIGHT))
 
     def _update_timers(self, dt: float) -> None:
-        self.ufo_timer -= dt
-        if self.ufo_timer <= 0.0:
+        if self.ufo_timer.tick(dt):
             self.spawn_ufo()
-            self.ufo_timer = float(C.UFO_SPAWN_EVERY)
+            self.ufo_timer.reset(C.UFO_SPAWN_EVERY)
 
     def _maybe_start_next_wave(self, dt: float) -> None:
         if self.asteroids:
             return
 
-        self.wave_cool -= dt
-        if self.wave_cool <= 0.0:
+        if self.wave_cool.tick(dt):
             self.start_wave()
-            self.wave_cool = float(C.WAVE_DELAY)
+            self.wave_cool.reset(C.WAVE_DELAY)
 
     def _handle_collisions(self) -> None:
         result = self._collision_mgr.resolve(
@@ -217,7 +215,7 @@ class World:
         ship.pos.xy = (C.WIDTH / 2, C.HEIGHT / 2)
         ship.vel.xy = (0, 0)
         ship.angle = -90.0
-        ship.invuln = float(C.SAFE_SPAWN_TIME)
+        ship.invuln.reset(C.SAFE_SPAWN_TIME)
 
         self.events.append("ship_explosion")
         if all(v <= 0 for v in self.lives.values()):

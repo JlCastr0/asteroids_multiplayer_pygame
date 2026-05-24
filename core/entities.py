@@ -7,7 +7,7 @@ import pygame as pg
 
 from core import config as C
 from core.commands import PlayerCommand
-from core.utils import Vec, angle_to_vec, wrap_pos
+from core.utils import Countdown, Vec, angle_to_vec, wrap_pos
 
 PlayerId = int
 
@@ -93,9 +93,9 @@ class Ship(pg.sprite.Sprite):
         self.pos = Vec(pos)
         self.vel = Vec(0, 0)
         self.angle = -90.0
-        self.cool = 0.0
+        self.cool = Countdown()
         self.target_pos: Vec | None = None
-        self.invuln = 0.0
+        self.invuln = Countdown()
         self.r = int(C.SHIP_RADIUS)
         self.rect = pg.Rect(0, 0, self.r * 2, self.r * 2)
 
@@ -121,7 +121,7 @@ class Ship(pg.sprite.Sprite):
         return None
 
     def _try_fire(self, bullets: pg.sprite.Group) -> "Bullet | None":
-        if self.cool > 0.0:
+        if self.cool.active:
             return None
 
         count = 0
@@ -136,25 +136,18 @@ class Ship(pg.sprite.Sprite):
         pos = self.pos + dirv * (self.r + C.BULLET_SPAWN_OFFSET)
         vel = self.vel + dirv * C.SHIP_BULLET_SPEED
 
-        self.cool = float(C.SHIP_FIRE_RATE)
+        self.cool.reset(C.SHIP_FIRE_RATE)
         return Bullet(self.player_id, pos, vel, ttl=C.BULLET_TTL)
 
     def hyperspace(self, pos: Vec) -> None:
         """Teleport to the given position. The caller picks where it is safe."""
         self.pos = Vec(pos)
         self.vel.xy = (0, 0)
-        self.invuln = float(C.SAFE_SPAWN_TIME)
+        self.invuln.reset(C.SAFE_SPAWN_TIME)
 
     def update(self, dt: float) -> None:
-        if self.cool > 0.0:
-            self.cool -= dt
-            if self.cool < 0.0:
-                self.cool = 0.0
-
-        if self.invuln > 0.0:
-            self.invuln -= dt
-            if self.invuln < 0.0:
-                self.invuln = 0.0
+        self.cool.tick(dt)
+        self.invuln.tick(dt)
 
         self.pos += self.vel * dt
         self.pos = wrap_pos(self.pos)
@@ -189,7 +182,7 @@ class UFO(pg.sprite.Sprite):
         self.pos = Vec(pos)
         self.vel = Vec(0, 0)
         self.speed = float(C.UFO_SPEED_SMALL if small else C.UFO_SPEED_BIG)
-        self.cool = 0.0
+        self.cool = Countdown()
         self.move_dir: Vec | None = None
 
         self.target_pos: Vec | None = None
@@ -254,10 +247,7 @@ class UFO(pg.sprite.Sprite):
         self.vel = dirv * self.speed
 
     def update(self, dt: float) -> None:
-        if self.cool > 0.0:
-            self.cool -= dt
-            if self.cool < 0.0:
-                self.cool = 0.0
+        self.cool.tick(dt)
 
         if self.small:
             self._update_pursue(dt)
@@ -285,7 +275,7 @@ class UFO(pg.sprite.Sprite):
             self.kill()
 
     def try_fire(self) -> "Bullet | None":
-        if self.cool > 0.0:
+        if self.cool.active:
             return None
 
         target_pos = self.target_pos
@@ -311,6 +301,6 @@ class UFO(pg.sprite.Sprite):
         ttl = float(C.UFO_BULLET_TTL)
 
         rate = C.UFO_FIRE_RATE_SMALL if self.small else C.UFO_FIRE_RATE_BIG
-        self.cool = float(rate)
+        self.cool.reset(rate)
 
         return Bullet(UFO_BULLET_OWNER, self.pos, vel, ttl=ttl)
