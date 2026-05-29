@@ -1,0 +1,7 @@
+# Server-only runtime dependency.
+#
+# The authoritative server is headless, pure Python — it imports neither
+# pygame nor any SDL/display library. Installing only this (instead of
+# requirements.txt or `pip install -e .`) keeps the VPS lean and never
+# pulls pygame onto a machine that renders nothing.
+websockets>=13,<17
