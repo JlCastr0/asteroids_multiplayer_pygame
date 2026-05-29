@@ -49,6 +49,8 @@ A match begins as soon as two players are connected to a room (`MIN_PLAYERS_TO_S
 
 The spectator client is read-only: it never spawns a ship, never sends input, and fits the entire 3840×2160 world into the configured `--width`/`--height` window via the `SpectatorCamera` (letterbox padding when the aspect ratio differs from the world's 16:9). Set `--rooms N` on the server to host N concurrent rooms; the default is 1, which matches the F4 single-room behavior.
 
+**Hosting on a VPS?** To run the server as a managed `systemd` service on a Linux host — background, auto-restart, journald logs — see [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
 ## Controls
 
 | Key       | Action |

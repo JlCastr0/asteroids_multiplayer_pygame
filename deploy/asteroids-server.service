@@ -1,0 +1,20 @@
+[Unit]
+Description=Asteroids multiplayer server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=asteroids
+WorkingDirectory=/opt/asteroids_multiplayer
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/asteroids_multiplayer/.venv/bin/python -m server \
+  --host 0.0.0.0 --port 8765 --rooms 4 \
+  --tokens-file /opt/asteroids_multiplayer/tokens.txt
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
