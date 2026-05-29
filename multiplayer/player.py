@@ -5,11 +5,12 @@ asyncio loop that:
 
 1. drains pending snapshots and applies them to a local shadow World;
 2. polls pygame input and sends an INPUT message every frame;
-3. renders the World through the reusable client/renderer.
+3. predicts the local ship from that input so it responds instantly,
+   extrapolates the remote ships, and renders through client/renderer.
 
-The local World is never simulated — every visible field comes from the
-authoritative server snapshots. Sticky inputs on the server side absorb
-network jitter without requiring fixed-step prediction here.
+Authoritative state still comes from server snapshots; prediction runs
+the real ship physics ahead of them and eases back on each correction,
+hiding the round-trip latency the player would otherwise feel.
 """
 
 from __future__ import annotations
@@ -39,6 +40,7 @@ from multiplayer.hud import (
     draw_scoreboard,
     draw_waiting_screen,
 )
+from multiplayer.prediction import PredictedInput, ShipPredictor
 from multiplayer.snapshot import snapshot_to_world
 from server.protocol import (
     HELLO,
@@ -74,6 +76,7 @@ class Player:
         self.running = True
 
         self.world = World(spawn_default_player=False)
+        self.predictor = ShipPredictor()
 
         pg.mixer.pre_init(
             C.AUDIO_FREQUENCY,
@@ -155,6 +158,7 @@ class Player:
                 if msg["type"] == SNAPSHOT:
                     snapshot_to_world(msg["data"], self.world)
                     self.server_tick = msg["tick"]
+                    self.predictor.rebase(self.world, self.player_id)
         except websockets.ConnectionClosed:
             pass
         finally:
@@ -200,12 +204,15 @@ class Player:
                         INPUT, self.server_tick, self.seq, command_to_dict(cmd)
                     )
                 )
-                self.seq += 1
             except websockets.ConnectionClosed:
                 self.running = False
                 break
 
+            self.predictor.record_input(PredictedInput(self.seq, cmd, dt))
+            self.seq += 1
+
             self.world.update_local_visual(dt, local_player_id=self.player_id)
+            self.predictor.step(self.world, self.player_id, dt)
             self.audio.update_thrust(cmd.thrust)
             self.audio.update_ufo_siren(list(self.world.ufos))
             self.audio.play_events(self.world.events)
@@ -226,11 +233,22 @@ class Player:
                 if self.player_id is not None
                 else None
             )
+            predicting = ship is not None and self.predictor.has_render_state
+            if predicting:
+                saved_pos = Vec(ship.pos)
+                saved_angle = ship.angle
+                ship.pos.xy = self.predictor.render_pos.xy
+                ship.angle = self.predictor.render_angle
+
             if ship is not None:
                 self.camera.update(ship.pos)
             else:
                 self.camera.update(Vec(C.WORLD_WIDTH / 2, C.WORLD_HEIGHT / 2))
             self.renderer.draw_world(self.world)
+
+            if predicting:
+                ship.pos.xy = saved_pos.xy
+                ship.angle = saved_angle
             draw_local_hud(
                 self.screen,
                 self.font,
