@@ -1,0 +1,84 @@
+# Como jogar — Asteroids Multiplayer
+
+Guia rápido para entrar no servidor da turma usando o **VS Code**.
+
+**Você já precisa ter:** Python 3.10–3.13 e o VS Code com a extensão **Python** (da Microsoft).
+
+**O professor te passa:** seu **token** e sua **sala** (um número de 0 a 7).
+
+| Dado | Valor |
+|---|---|
+| Servidor (host) | `2.25.147.96` |
+| Porta | `8765` |
+| Token | _(o professor te dá — ex.: `Zk3pQ9mXr2T`)_ |
+| Sala | _(o professor te dá: 0 a 7)_ |
+
+## 1. Baixar o projeto
+
+Escolha uma das formas:
+
+- **Clonar pelo VS Code:** `Ctrl+Shift+P` → digite **Git: Clone** → cole `https://github.com/jucimarjr/asteroids_multiplayer` → escolha uma pasta → **Open**.
+- **Ou baixar o ZIP:** no GitHub, botão verde **Code → Download ZIP**, extraia, e no VS Code use **File → Open Folder** na pasta extraída.
+
+## 2. Criar o ambiente e instalar as dependências
+
+Deixe o VS Code cuidar disso:
+
+1. `Ctrl+Shift+P` → **Python: Create Environment**
+2. Escolha **Venv**
+3. Escolha um **Python 3.10–3.13**
+4. Marque **`requirements.txt`** para instalar
+
+Ele cria a pasta `.venv`, seleciona como interpretador e instala o `pygame` e o `websockets`. Espere terminar.
+
+### (Alternativa) Pelo terminal integrado
+
+Abra o terminal com `Ctrl` + crase (`` ` ``) e rode:
+
+| Passo | Windows | macOS / Linux |
+|---|---|---|
+| Criar | `py -m venv .venv` | `python3 -m venv .venv` |
+| Ativar | `.venv\Scripts\Activate.ps1` | `source .venv/bin/activate` |
+| Instalar | `pip install -r requirements.txt` | `pip install -r requirements.txt` |
+
+No Windows, se o PowerShell recusar o `Activate.ps1`, use o **Prompt de Comando** (`.venv\Scripts\activate.bat`) ou simplesmente o método do VS Code acima.
+
+## 3. Entrar no jogo
+
+No terminal integrado (`Ctrl` + crase) — com o `.venv` já ativo — rode, **trocando** token, sala e nome:
+
+```
+python -m multiplayer.player --host 2.25.147.96 --port 8765 --token SEU_TOKEN --room SUA_SALA --name SEU_NOME
+```
+
+Exemplo:
+
+```
+python -m multiplayer.player --host 2.25.147.96 --port 8765 --token Zk3pQ9mXr2T --room 0 --name Ana
+```
+
+Abre a janela do jogo. **A partida começa quando 2 jogadores entram na mesma sala.** Use um nome de uma palavra (sem espaços).
+
+## Controles
+
+| Tecla | Ação |
+|---|---|
+| ← → | Girar |
+| ↑ | Acelerar |
+| ↓ | Escudo |
+| Espaço | Atirar |
+| Shift esquerdo | Hiperespaço |
+| Shift direito | Liga/desliga o som |
+| Enter | Reiniciar (na tela de fim de partida) |
+| Esc ou Q | Sair |
+
+## Deu problema?
+
+| Mensagem / sintoma | O que fazer |
+|---|---|
+| `unauthorized` | Token errado — confira com o professor |
+| `room_full` | Sua sala já tem 8 jogadores — confirme seu número de sala |
+| `invalid_room` | Sala fora do intervalo 0–7 |
+| `connection refused` / trava ao conectar | Confira o IP e a porta; o servidor pode estar desligado fora do horário da aula |
+| `pygame` não instala | Confirme `python --version` entre 3.10 e 3.13 (evite 3.14+) |
+| A janela não abre | Rode numa máquina com tela (não por acesso remoto/SSH) |
