@@ -10,6 +10,11 @@ WINDOW_HEIGHT = 720
 FPS = 60
 SNAPSHOT_HZ = 30
 
+# Client-side prediction (F6): the local ship is simulated ahead of the
+# server so input feels instant, then eased back toward each snapshot.
+PREDICTION_SNAP_DIST = 150.0  # px; above this error snap instead of ease
+PREDICTION_SMOOTH = 15.0  # exponential correction rate (1/s)
+
 # Per-room cap from F5 onward; before F5 this was the global server
 # cap. Single-room servers (default `--rooms 1`) keep the same effect.
 MAX_PLAYERS = 8
