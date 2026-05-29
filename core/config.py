@@ -14,6 +14,9 @@ SNAPSHOT_HZ = 30
 # server so input feels instant, then eased back toward each snapshot.
 PREDICTION_SNAP_DIST = 150.0  # px; above this error snap instead of ease
 PREDICTION_SMOOTH = 15.0  # exponential correction rate (1/s)
+# The server consumes one queued input per player per tick; the queue is
+# a small jitter buffer. The cap bounds added input latency under bursts.
+INPUT_QUEUE_CAP = 8
 
 # Per-room cap from F5 onward; before F5 this was the global server
 # cap. Single-room servers (default `--rooms 1`) keep the same effect.

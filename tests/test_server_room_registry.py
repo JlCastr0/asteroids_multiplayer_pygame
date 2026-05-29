@@ -81,15 +81,66 @@ def test_server_rejects_zero_or_negative_rooms():
         Server("127.0.0.1", 0, allowed_tokens={VALID_TOKEN}, rooms=0)
 
 
-def test_inputs_for_room_filters_by_room_id():
+def test_drain_inputs_pops_one_per_player_by_room():
     server = Server("127.0.0.1", 0, allowed_tokens={VALID_TOKEN}, rooms=2)
     cmd_a = PlayerCommand(thrust=True)
     cmd_b = PlayerCommand(shoot=True)
-    server._inputs_by_player_id = {1: cmd_a, 2: cmd_b, 3: cmd_a}
+    server._input_queues = {
+        1: deque([(10, cmd_a)]),
+        2: deque([(20, cmd_b)]),
+        3: deque([(30, cmd_a)]),
+    }
     server.room_by_player_id = {1: 0, 2: 1, 3: 0}
 
-    assert server._inputs_for_room(0) == {1: cmd_a, 3: cmd_a}
-    assert server._inputs_for_room(1) == {2: cmd_b}
+    assert server._drain_inputs_for_room(0) == {1: cmd_a, 3: cmd_a}
+    assert server._drain_inputs_for_room(1) == {2: cmd_b}
+    # Consumed: queues now empty and the last seq recorded for the ack.
+    assert server._last_processed_seq == {1: 10, 2: 20, 3: 30}
+    assert all(len(q) == 0 for q in server._input_queues.values())
+
+
+def test_drain_inputs_omits_starved_players():
+    server = Server("127.0.0.1", 0, allowed_tokens={VALID_TOKEN}, rooms=1)
+    cmd = PlayerCommand(thrust=True)
+    server._input_queues = {1: deque([(5, cmd)]), 2: deque()}
+    server.room_by_player_id = {1: 0, 2: 0}
+
+    # Player 2 has no queued input -> omitted (its ship coasts).
+    assert server._drain_inputs_for_room(0) == {1: cmd}
+    # Player 1's queue is now empty too -> next tick both coast.
+    assert server._drain_inputs_for_room(0) == {}
+    assert server._last_processed_seq == {1: 5}
+
+
+def test_enqueue_input_caps_queue_length():
+    server = Server("127.0.0.1", 0, allowed_tokens={VALID_TOKEN}, rooms=1)
+    cmd = PlayerCommand()
+    for s in range(C.INPUT_QUEUE_CAP + 5):
+        server._enqueue_input(1, s, cmd)
+
+    q = server._input_queues[1]
+    assert len(q) == C.INPUT_QUEUE_CAP
+    # The five oldest (seqs 0..4) were dropped; newest is kept.
+    assert q[0][0] == 5
+    assert q[-1][0] == C.INPUT_QUEUE_CAP + 4
+
+
+def test_broadcast_injects_per_player_ack():
+    server = Server("127.0.0.1", 0, allowed_tokens={VALID_TOKEN}, rooms=1)
+    ws = FakeWebSocket([])
+    pid = 1
+    server.connections[pid] = ws
+    server.room_by_player_id[pid] = 0
+    server._names_by_player_id[pid] = "alice"
+    server.worlds[0].spawn_player(pid)
+    server._last_processed_seq[pid] = 42
+
+    asyncio.run(server._broadcast_snapshot())
+
+    assert ws.sent, "expected a snapshot to be sent"
+    msg = json.loads(ws.sent[-1])
+    assert msg["type"] == "snapshot"
+    assert msg["data"]["ack"] == 42
 
 
 def test_pids_in_room_returns_only_matching_players():

@@ -3,8 +3,10 @@
 The server owns a single authoritative `World`, advances it at FPS (60 Hz),
 and broadcasts a serialized snapshot to every connected client at
 SNAPSHOT_HZ (30 Hz). Each client owns one ship — spawned at the welcome
-handshake and removed on disconnect — and pushes INPUT messages that the
-tick loop applies on the next update.
+handshake and removed on disconnect — and pushes INPUT messages into a
+per-player queue that the tick loop drains one entry per tick. The last
+consumed input seq is echoed back in each snapshot (the ack) so the
+client can reconcile its prediction against the authoritative state.
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ import asyncio
 import contextlib
 import sys
 import time
+from collections import deque
 from pathlib import Path
 from typing import Any
 
@@ -71,10 +74,15 @@ class Server:
         self.connections: dict[int, Any] = {}
         self._next_player_id = 1
         self._seq_by_player_id: dict[int, int] = {}
-        # Last input seen for each player. Kept sticky between frames so a
-        # 30 Hz client still drives a 60 Hz simulation smoothly; the slot
-        # is cleared when the player disconnects.
-        self._inputs_by_player_id: dict[int, PlayerCommand] = {}
+        # Per-player FIFO of (client_seq, command). The tick loop consumes
+        # exactly one entry per player per tick, so the server's trajectory
+        # is reproducible on the client for prediction/replay; the last
+        # consumed seq is echoed back as the snapshot ack. An empty queue
+        # means the ship coasts that tick. This replaces the old sticky
+        # "latest input wins" slot, which could not be reconciled because
+        # the client could not know how many times a command was applied.
+        self._input_queues: dict[int, deque[tuple[int, PlayerCommand]]] = {}
+        self._last_processed_seq: dict[int, int] = {}
         # Display names from the HELLO handshake, forwarded into every
         # snapshot so each client can render a scoreboard.
         self._names_by_player_id: dict[int, str] = {}
@@ -108,7 +116,7 @@ class Server:
             for room_id, world in self.worlds.items():
                 prev_state = world.match_state
                 prev_deaths = dict(world.deaths)
-                world.update(dt, self._inputs_for_room(room_id))
+                world.update(dt, self._drain_inputs_for_room(room_id))
                 self._log_world_events(room_id, world, prev_state, prev_deaths)
             self.tick += 1
 
@@ -141,12 +149,37 @@ class Server:
             return "?"
         return self._names_by_player_id.get(player_id, f"P{player_id}")
 
-    def _inputs_for_room(self, room_id: int) -> dict[int, PlayerCommand]:
-        return {
-            pid: cmd
-            for pid, cmd in self._inputs_by_player_id.items()
-            if self.room_by_player_id.get(pid) == room_id
-        }
+    def _drain_inputs_for_room(self, room_id: int) -> dict[int, PlayerCommand]:
+        """Pop one queued input per player in the room for this tick.
+
+        Records each consumed seq for the snapshot ack. A player whose
+        queue is empty is omitted, so their ship simply coasts this tick
+        (the deterministic starvation policy that keeps the server's
+        trajectory reproducible for client-side reconciliation).
+        """
+        commands: dict[int, PlayerCommand] = {}
+        for pid in self._pids_in_room(room_id):
+            queue = self._input_queues.get(pid)
+            if not queue:
+                continue
+            seq, cmd = queue.popleft()
+            self._last_processed_seq[pid] = seq
+            commands[pid] = cmd
+        return commands
+
+    def _enqueue_input(
+        self, player_id: int, seq: int, cmd: PlayerCommand
+    ) -> None:
+        """Append an input to a player's queue, capping its length.
+
+        The cap bounds how much input latency can build up if a client
+        ever sends faster than the server drains; the oldest entry is
+        dropped first.
+        """
+        queue = self._input_queues.setdefault(player_id, deque())
+        queue.append((seq, cmd))
+        if len(queue) > C.INPUT_QUEUE_CAP:
+            queue.popleft()
 
     def _names_for_room(self, room_id: int) -> dict[int, str]:
         return {
@@ -195,7 +228,12 @@ class Server:
                     continue
                 seq = self._seq_by_player_id.get(player_id, 0)
                 self._seq_by_player_id[player_id] = seq + 1
-                payload = envelope(SNAPSHOT, self.tick, seq, snap)
+                # Per-player ack of the last input the tick loop consumed.
+                # Shallow copy so each client gets its own ack without
+                # rebuilding the (shared) room snapshot.
+                data = dict(snap)
+                data["ack"] = self._last_processed_seq.get(player_id, 0)
+                payload = envelope(SNAPSHOT, self.tick, seq, data)
                 # Connection handler cleans up its own slot on close;
                 # skipping this client for the current frame is the
                 # right local response.
@@ -241,8 +279,10 @@ class Server:
                     # client side already refuses to send these.
                     continue
                 if msg["type"] == INPUT:
-                    self._inputs_by_player_id[player_id] = dict_to_command(
-                        msg["data"]
+                    self._enqueue_input(
+                        player_id,
+                        msg["seq"],
+                        dict_to_command(msg["data"]),
                     )
                 elif msg["type"] == RESTART_REQUEST:
                     self._handle_restart_request(player_id)
@@ -252,7 +292,8 @@ class Server:
             self.spectator_pids.discard(player_id)
             self.connections.pop(player_id, None)
             self._seq_by_player_id.pop(player_id, None)
-            self._inputs_by_player_id.pop(player_id, None)
+            self._input_queues.pop(player_id, None)
+            self._last_processed_seq.pop(player_id, None)
             self._names_by_player_id.pop(player_id, None)
             world = self.worlds.get(room_id)
             if world is not None and not was_spectator:
