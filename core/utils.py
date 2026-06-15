@@ -82,6 +82,9 @@ class Vec:
             return Vec(0.0, 0.0)
         return Vec(self.x / length, self.y / length)
 
+    def dot(self, other: Vec) -> float:
+        return self.x * other.x + self.y * other.y
+
 
 class Countdown:
     """Saturating countdown timer driven by dt.
@@ -119,6 +122,23 @@ class Countdown:
 
 def wrap_pos(pos: Vec) -> Vec:
     return Vec(pos.x % C.WORLD_WIDTH, pos.y % C.WORLD_HEIGHT)
+
+
+def toroidal_delta(frm: Vec, to: Vec) -> Vec:
+    """Shortest vector from `frm` to `to` on the wrapping world.
+
+    The world wraps at WORLD_WIDTH x WORLD_HEIGHT. This always takes the
+    short way around each axis.
+    """
+    half_w = C.WORLD_WIDTH / 2
+    half_h = C.WORLD_HEIGHT / 2
+    dx = (to.x - frm.x + half_w) % C.WORLD_WIDTH - half_w
+    dy = (to.y - frm.y + half_h) % C.WORLD_HEIGHT - half_h
+    return Vec(dx, dy)
+
+
+def toroidal_distance(a: Vec, b: Vec) -> float:
+    return toroidal_delta(a, b).length()
 
 
 def angle_to_vec(deg: float) -> Vec:

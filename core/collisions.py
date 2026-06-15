@@ -16,7 +16,7 @@ from core.entities import (
     PlayerId,
     Ship,
 )
-from core.utils import Vec, rand_unit_vec
+from core.utils import Vec, rand_unit_vec, toroidal_delta, wrap_pos
 
 
 def _segment_circle_hit(
@@ -85,7 +85,55 @@ class CollisionManager:
         self._ship_vs_asteroids(ships, asteroids, result)
         self._ship_vs_ufos(ships, ufos, result)
         self._ship_vs_ufo_bullets(ships, bullets, result)
+        self._ship_vs_ships(ships, result)
         return result
+
+    def _ship_vs_ships(
+        self,
+        ships: dict[PlayerId, Ship],
+        result: CollisionResult,
+    ) -> None:
+        """Resolve collisions between ships by pushing them apart.
+
+        Uses toroidal-aware distance and normal to support wrapping.
+        Applying a small impulse (SHIP_PUSH_STRENGTH) ensures ships
+        don't get stuck and provides tactile feedback.
+        """
+        pids = list(ships.keys())
+        for i in range(len(pids)):
+            for j in range(i + 1, len(pids)):
+                s1 = ships[pids[i]]
+                s2 = ships[pids[j]]
+
+                delta = toroidal_delta(s2.pos, s1.pos)
+                dist_sq = delta.length_squared()
+                min_dist = s1.r + s2.r
+                if dist_sq < min_dist * min_dist:
+                    dist = delta.length()
+                    if dist < 1e-3:
+                        normal = Vec(1, 0)
+                        dist = 0.1
+                    else:
+                        normal = delta * (1.0 / dist)
+
+                    # 1. Static resolution: push them apart so they don't overlap.
+                    overlap = min_dist - dist
+                    s1.pos = wrap_pos(s1.pos + normal * (overlap * 0.5))
+                    s2.pos = wrap_pos(s2.pos - normal * (overlap * 0.5))
+
+                    # 2. Dynamic resolution: apply a push impulse.
+                    # We add velocity along the normal to separate them.
+                    relative_vel = s1.vel - s2.vel
+                    vel_along_normal = relative_vel.dot(normal)
+
+                    # Only apply impulse if they aren't already moving apart fast enough.
+                    strength = C.SHIP_PUSH_STRENGTH
+                    if vel_along_normal < strength:
+                        impulse = normal * (strength - max(0.0, vel_along_normal))
+                        s1.vel += impulse * 0.5
+                        s2.vel -= impulse * 0.5
+
+                    result.events.append("ship_push")
 
     def _bullets_vs_asteroids(
         self,

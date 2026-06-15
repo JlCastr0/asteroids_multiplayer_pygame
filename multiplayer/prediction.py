@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from core import config as C
 from core.commands import PlayerCommand
 from core.entities import Bullet, Ship
-from core.utils import Vec, wrap_pos
+from core.utils import Vec, toroidal_delta, toroidal_distance, wrap_pos
 from core.world import World
 
 
@@ -71,24 +71,6 @@ def simulate_from_authority(
         sim.apply_command(entry.cmd, entry.dt, scratch)
         sim.update(entry.dt)
     return sim
-
-
-def toroidal_delta(frm: Vec, to: Vec) -> Vec:
-    """Shortest vector from `frm` to `to` on the wrapping world.
-
-    The world wraps at WORLD_WIDTH x WORLD_HEIGHT, so a naive
-    subtraction would smear a correction across the whole map near a
-    seam. This always takes the short way around each axis.
-    """
-    half_w = C.WORLD_WIDTH / 2
-    half_h = C.WORLD_HEIGHT / 2
-    dx = (to.x - frm.x + half_w) % C.WORLD_WIDTH - half_w
-    dy = (to.y - frm.y + half_h) % C.WORLD_HEIGHT - half_h
-    return Vec(dx, dy)
-
-
-def toroidal_distance(a: Vec, b: Vec) -> float:
-    return toroidal_delta(a, b).length()
 
 
 def ease_toward(cur: Vec, goal: Vec, rate: float, dt: float) -> Vec:
