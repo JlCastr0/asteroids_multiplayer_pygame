@@ -1,6 +1,6 @@
 # Mecânica de Empurrão entre Naves (Ship Pushing)
 
-Esta nova mecânica permite que as naves dos jogadores interajam fisicamente entre si, empurrando-se ao colidir, em vez de simplesmente atravessarem umas às outras.
+Esta nova mecânica permite que as naves dos jogadores interajam fisicamente entre si, empurrando-se ao colidir, em vez de simplesmente atravessarem umas às outras. 
 
 ## Funcionamento
 
